@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sensor Dashboard - Firebase Auth</title>
+    <title>Sensor Dashboard - Firebase Cloud</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
@@ -177,7 +178,7 @@
 </div>
 
 <script>
-    // 2. PASTE YOUR CONFIG FROM FIREBASE CONSOLE HERE
+    // --- FIREBASE CONFIGURATION ---
     const firebaseConfig = {
         apiKey: "AIzaSyCbwOAj98pbXdURCV0T4TgzdoFNCmg1f7o",
         authDomain: "farm-project-8d0f9.firebaseapp.com",
@@ -185,67 +186,50 @@
         storageBucket: "farm-project-8d0f9.firebasestorage.app",
         messagingSenderId: "378530800519",
         appId: "1:378530800519:web:b0970b40576db85410a922",
-        measurementId: "G-W5VCHNG12P"
+        measurementId: "G-W5VCHNG12P",
+        // Added the Realtime Database URL
+        databaseURL: "https://farm-project-8d0f9-default-rtdb.firebaseio.com"
     };
 
-    // 3. Initialize Firebase
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
+    const db = firebase.database();
 
     const loginPage = document.getElementById("loginPage");
     const registerPage = document.getElementById("registerPage");
     const dashboard = document.getElementById("dashboard");
 
-    // 4. Persistence Logic: Check if user is already logged in
+    // Auth state observer
     auth.onAuthStateChanged((user) => {
         if (user) {
             loginPage.style.display = "none";
             registerPage.style.display = "none";
             dashboard.style.display = "flex";
             setTimeout(resizePlots, 150);
+            startListeningToData(); // Start Firebase listener
         } else {
             loginPage.style.display = "flex";
             dashboard.style.display = "none";
         }
     });
 
-    function showRegister(){ 
-        document.getElementById("loginUser").value = "";
-        document.getElementById("loginPass").value = "";
-        loginPage.style.display="none"; 
-        registerPage.style.display="flex"; 
-    }
-    function showLogin(){ 
-        document.getElementById("regUser").value = "";
-        document.getElementById("regPass").value = "";
-        registerPage.style.display="none"; 
-        loginPage.style.display="flex"; 
-    }
-
+    // Auth Logic
+    function showRegister(){ loginPage.style.display="none"; registerPage.style.display="flex"; }
+    function showLogin(){ registerPage.style.display="none"; loginPage.style.display="flex"; }
     function register(){
         const email = document.getElementById("regUser").value;
         const pass = document.getElementById("regPass").value;
-        if(!email || !pass) { alert("Please enter both fields"); return; }
-        
-        // Firebase Create User
-        auth.createUserWithEmailAndPassword(email, pass)
-            .then(() => alert("Registration Successful!"))
-            .catch(error => alert(error.message));
+        auth.createUserWithEmailAndPassword(email, pass).catch(e => alert(e.message));
     }
-
     function login(){
         const email = document.getElementById("loginUser").value;
         const pass = document.getElementById("loginPass").value;
-        
-        // Firebase Sign In
-        auth.signInWithEmailAndPassword(email, pass)
-            .catch(error => alert("Login Failed: " + error.message));
+        auth.signInWithEmailAndPassword(email, pass).catch(e => alert(e.message));
     }
+    function logout() { auth.signOut().then(() => location.reload()); }
 
-    function logout() {
-        auth.signOut().then(() => location.reload());
-    }
-
+    // Plotly Initialization
     function initPlot(id, label, color) {
         Plotly.newPlot(id, [{x:[], y:[], mode:'lines', line:{color:color, width:2}}], {
             template: 'plotly_dark',
@@ -270,6 +254,7 @@
     }
     window.addEventListener('resize', resizePlots);
 
+    // Zoom Logic
     function toggleZoom(id) {
         const panel = document.getElementById(`panel-${id}`);
         const btn = document.getElementById(`zoom-btn-${id}`);
@@ -283,27 +268,46 @@
         setTimeout(() => Plotly.Plots.resize(id), 50);
     }
 
+    // --- DATA HANDLING ---
     let soilFlag=[], soilVal=[], airHum=[], time=[];
     let live={soilFlag:true, soilVal:true, airHum:true};
     function toggleLive(id){ live[id] = !live[id]; }
 
-    const ws = new WebSocket("ws://0.0.0.0:8765");
-    ws.onmessage = (e) => {
-        const parts = e.data.split(",");
-        if(parts.length !== 3) return;
-        const sf = parseFloat(parts[0]), sv = parseFloat(parts[1]), ah = parseFloat(parts[2]), t = new Date();
+    // FIREBASE LISTENER (Replaces WebSocket)
+    function startListeningToData() {
+        // We listen to the same 'sensor_data' path that the Pi is writing to
+        db.ref('sensor_data').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(!data) return;
 
-        time.push(t); soilFlag.push(sf); soilVal.push(sv); airHum.push(ah);
-        if(time.length > 50) { time.shift(); soilFlag.shift(); soilVal.shift(); airHum.shift(); }
+            // Extract values from Firebase JSON
+            const sf = parseFloat(data.soilFlag);
+            const sv = parseFloat(data.soilValue);
+            const ah = parseFloat(data.airHumidity);
+            const t = new Date();
 
-        if(live.soilFlag) Plotly.update("soilFlag", {x:[time], y:[soilFlag]});
-        if(live.soilVal) Plotly.update("soilVal", {x:[time], y:[soilVal]});
-        if(live.airHum) Plotly.update("airHum", {x:[time], y:[airHum]});
+            // Push to local arrays for plotting
+            time.push(t);
+            soilFlag.push(sf);
+            soilVal.push(sv);
+            airHum.push(ah);
 
-        const p = document.getElementById("pump");
-        p.className = sf === 1 ? "pump-on" : "pump-off";
-        p.innerText = sf === 1 ? "💧 Pump is ACTIVE" : "Pump Status: IDLE";
-    };
+            // Keep only the last 50 points
+            if(time.length > 50) {
+                time.shift(); soilFlag.shift(); soilVal.shift(); airHum.shift();
+            }
+
+            // Update graphs
+            if(live.soilFlag) Plotly.update("soilFlag", {x:[time], y:[soilFlag]});
+            if(live.soilVal) Plotly.update("soilVal", {x:[time], y:[soilVal]});
+            if(live.airHum) Plotly.update("airHum", {x:[time], y:[airHum]});
+
+            // Update Pump Status UI
+            const p = document.getElementById("pump");
+            p.className = sf === 1 ? "pump-on" : "pump-off";
+            p.innerText = sf === 1 ? "💧 Pump is ACTIVE" : "Pump Status: IDLE";
+        });
+    }
 </script>
 </body>
 </html>
