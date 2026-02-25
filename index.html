@@ -1,391 +1,309 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sensor Dashboard</title>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Dashboard - Firebase Auth</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        html, body {
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; 
+            background: #0e1117;
+            color: #e6edf3;
+            font-family: sans-serif;
+        }
 
-<style>
-body {
-  background:#0e1117;
-  color:#e6edf3;
-  font-family:Arial;
-  margin:0;
-}
+        /* ---------- AUTH SECTIONS ---------- */
+        .auth-container { height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .auth-box { background: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; width: 300px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .auth-box input { width: 100%; margin: 10px 0; padding: 10px; box-sizing: border-box; background: #0d1117; color: white; border: 1px solid #30363d; border-radius: 5px; }
+        .auth-btn { width: 100%; padding: 10px; background: #238636; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
 
-/* ---------- AUTH ---------- */
-.auth-container{
-  height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
+        /* ---------- DASHBOARD LAYOUT ---------- */
+        .dashboard {
+            display: none; 
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            padding: 10px;
+            box-sizing: border-box;
+            position: relative;
+        }
 
-.auth-box{
-  background:#161b22;
-  border:1px solid #30363d;
-  border-radius:10px;
-  padding:30px;
-  width:300px;
-}
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 40px;
+            flex-shrink: 0;
+        }
 
-.auth-box h2{
-  margin-top:0;
-  text-align:center;
-}
+        #pump {
+            height: 40px;
+            line-height: 40px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            margin: 5px 0 10px 0;
+            flex-shrink: 0;
+            font-size: 1.1em;
+        }
+        .pump-on { background: #1f6f4a; border: 1px solid #238636; color: #aff5b4; }
+        .pump-off { background: #482323; border: 1px solid #6e1f1f; color: #ff7b72; }
 
-.auth-box input{
-  width:100%;
-  padding:8px;
-  margin:6px 0;
-  border-radius:4px;
-  border:1px solid #444;
-  background:#0e1117;
-  color:#eee;
-}
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr)); 
+            gap: 10px;
+            flex: 1; 
+            min-height: 0; 
+            width: 100%;
+        }
 
-.auth-btn{
-  width:100%;
-  margin-top:10px;
-  padding:8px;
-  background:#238636;
-  border:none;
-  color:white;
-  border-radius:4px;
-  cursor:pointer;
-}
+        .panel {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+            min-height: 0; 
+            min-width: 0; 
+            position: relative;
+            transition: all 0.2s ease;
+        }
 
-.switch{
-  margin-top:10px;
-  text-align:center;
-  font-size:12px;
-  cursor:pointer;
-  color:#58a6ff;
-}
+        .panel.zoomed {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 9999;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            background: #0e1117;
+        }
 
-/* ---------- DASHBOARD ---------- */
-.dashboard{
-  display:none;
-  padding:10px;
-  height:100vh;
-  box-sizing:border-box;
-}
+        .chart-container {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+            min-height: 0;
+        }
 
-.header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
+        .plotly-graph-div {
+            position: absolute;
+            top: 0; bottom: 0; left: 0; right: 0;
+        }
 
-.logout-btn{
-  background:#6e1f1f;
-  border:1px solid #a33;
-  color:#fff;
-  padding:6px 10px;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:12px;
-}
-
-.logout-btn:hover{
-  background:#a33;
-}
-
-.grid {
-  display:grid;
-  grid-template-columns:1fr 1fr 1fr;
-  gap:12px;
-  height:calc(100vh - 90px);
-}
-
-.grid.fullscreen {
-  grid-template-columns:1fr;
-}
-
-.panel {
-  background:#161b22;
-  border:1px solid #30363d;
-  border-radius:10px;
-  padding:8px;
-  display:flex;
-  flex-direction:column;
-  min-height:0;
-}
-
-.panel.expanded {
-  height:auto;
-}
-
-.panel > div:last-child{
-  flex:1;
-}
-
-.controls {
-  display:flex;
-  gap:6px;
-  margin-bottom:6px;
-}
-
-.btn {
-  background:#222;
-  border:1px solid #444;
-  color:#eee;
-  padding:4px 8px;
-  border-radius:4px;
-  cursor:pointer;
-  font-size:12px;
-}
-
-.btn:hover { background:#444; }
-
-.pump-on {
-  background:#1f6f4a;
-  padding:12px;
-  border-radius:8px;
-  text-align:center;
-  font-weight:bold;
-}
-
-.pump-off {
-  background:#6e1f1f;
-  padding:12px;
-  border-radius:8px;
-  text-align:center;
-  font-weight:bold;
-}
-
-/* ---------- RESPONSIVE ---------- */
-@media (max-width:1100px){
-  .grid{
-    grid-template-columns:1fr 1fr;
-  }
-}
-
-@media (max-width:700px){
-  .grid{
-    grid-template-columns:1fr;
-    height:auto;
-  }
-
-  .dashboard{
-    height:auto;
-  }
-
-  .controls{
-    flex-wrap:wrap;
-  }
-
-  .btn{
-    font-size:11px;
-    padding:3px 6px;
-  }
-}
-</style>
+        .controls { display: flex; gap: 5px; margin-bottom: 5px; flex-shrink: 0; }
+        .btn { 
+            background: #21262d; 
+            border: 1px solid #30363d; 
+            color: #c9d1d9; 
+            padding: 4px 10px; 
+            font-size: 14px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn:hover { background: #30363d; }
+        .logout-btn { background: #6e1f1f; padding: 5px 12px; border: none; color: white; cursor: pointer; border-radius: 4px; font-size: 13px; }
+    </style>
 </head>
-
 <body>
 
-<!-- LOGIN -->
 <div class="auth-container" id="loginPage">
-  <div class="auth-box">
-    <h2>Login</h2>
-    <input id="loginUser" placeholder="Username">
-    <input id="loginPass" type="password" placeholder="Password">
-    <button class="auth-btn" onclick="login()">Login</button>
-    <div class="switch" onclick="showRegister()">Create account</div>
-  </div>
+    <div class="auth-box">
+        <h2>Login</h2>
+        <input id="loginUser" placeholder="Email (e.g. name@test.com)">
+        <input id="loginPass" type="password" placeholder="Password">
+        <button class="auth-btn" onclick="login()">Sign In</button>
+        <div style="text-align:center; margin-top:15px; font-size:12px; cursor:pointer; color:#58a6ff;" onclick="showRegister()">Create account</div>
+    </div>
 </div>
 
-<!-- REGISTER -->
 <div class="auth-container" id="registerPage" style="display:none;">
-  <div class="auth-box">
-    <h2>Register</h2>
-    <input id="regUser" placeholder="Username">
-    <input id="regPass" type="password" placeholder="Password">
-    <button class="auth-btn" onclick="register()">Register</button>
-    <div class="switch" onclick="showLogin()">Back to login</div>
-  </div>
+    <div class="auth-box">
+        <h2>Register</h2>
+        <input id="regUser" placeholder="Email">
+        <input id="regPass" type="password" placeholder="Password">
+        <button class="auth-btn" onclick="register()">Register</button>
+        <div style="text-align:center; margin-top:15px; font-size:12px; cursor:pointer; color:#58a6ff;" onclick="showLogin()">Back to login</div>
+    </div>
 </div>
 
-<!-- DASHBOARD -->
 <div class="dashboard" id="dashboard">
-
-<div class="header">
-  <h2>Sensor Dashboard</h2>
-  <div class="logout-btn" onclick="logout()">Logout</div>
-</div>
-
-<div id="pump" class="pump-off">Pump OFF</div>
-
-<div class="grid" id="grid">
-
-  <div class="panel" id="panel-soilFlag">
-    <div class="controls">
-      <div class="btn" onclick="zoomIn('soilFlag')">＋</div>
-      <div class="btn" onclick="zoomOut('soilFlag')">－</div>
-      <div class="btn" onclick="toggleFullscreen('panel-soilFlag')">⛶</div>
-      <div class="btn" onclick="toggleTrace('soilFlag')">Value</div>
-      <div class="btn" onclick="toggleLive('soilFlag')">▶/⏸</div>
+    <div class="header">
+        <h2 style="margin:0;">Sensor Dashboard</h2>
+        <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
-    <div id="soilFlag"></div>
-  </div>
 
-  <div class="panel" id="panel-soilVal">
-    <div class="controls">
-      <div class="btn" onclick="zoomIn('soilVal')">＋</div>
-      <div class="btn" onclick="zoomOut('soilVal')">－</div>
-      <div class="btn" onclick="toggleFullscreen('panel-soilVal')">⛶</div>
-      <div class="btn" onclick="toggleTrace('soilVal')">Value</div>
-      <div class="btn" onclick="toggleLive('soilVal')">▶/⏸</div>
+    <div id="pump" class="pump-off">Pump Status: IDLE</div>
+
+    <div class="grid">
+        <div class="panel" id="panel-soilFlag">
+            <div class="controls">
+                <div class="btn" title="Toggle Live" onclick="toggleLive('soilFlag')">Live ▶/⏸</div>
+                <div class="btn" id="zoom-btn-soilFlag" title="Zoom" onclick="toggleZoom('soilFlag')">⛶</div>
+            </div>
+            <div class="chart-container"><div id="soilFlag"></div></div>
+        </div>
+        <div class="panel" id="panel-soilVal">
+            <div class="controls">
+                <div class="btn" title="Toggle Live" onclick="toggleLive('soilVal')">Live ▶/⏸</div>
+                <div class="btn" id="zoom-btn-soilVal" title="Zoom" onclick="toggleZoom('soilVal')">⛶</div>
+            </div>
+            <div class="chart-container"><div id="soilVal"></div></div>
+        </div>
+        <div class="panel" id="panel-airHum">
+            <div class="controls">
+                <div class="btn" title="Toggle Live" onclick="toggleLive('airHum')">Live ▶/⏸</div>
+                <div class="btn" id="zoom-btn-airHum" title="Zoom" onclick="toggleZoom('airHum')">⛶</div>
+            </div>
+            <div class="chart-container"><div id="airHum"></div></div>
+        </div>
     </div>
-    <div id="soilVal"></div>
-  </div>
-
-  <div class="panel" id="panel-airHum">
-    <div class="controls">
-      <div class="btn" onclick="zoomIn('airHum')">＋</div>
-      <div class="btn" onclick="zoomOut('airHum')">－</div>
-      <div class="btn" onclick="toggleFullscreen('panel-airHum')">⛶</div>
-      <div class="btn" onclick="toggleTrace('airHum')">Value</div>
-      <div class="btn" onclick="toggleLive('airHum')">▶/⏸</div>
-    </div>
-    <div id="airHum"></div>
-  </div>
-
-</div>
 </div>
 
 <script>
-function showRegister(){ loginPage.style.display="none"; registerPage.style.display="flex"; }
-function showLogin(){ registerPage.style.display="none"; loginPage.style.display="flex"; }
+    // 2. PASTE YOUR CONFIG FROM FIREBASE CONSOLE HERE
+    const firebaseConfig = {
+        apiKey: "AIzaSyCbwOAj98pbXdURCV0T4TgzdoFNCmg1f7o",
+        authDomain: "farm-project-8d0f9.firebaseapp.com",
+        projectId: "farm-project-8d0f9",
+        storageBucket: "farm-project-8d0f9.firebasestorage.app",
+        messagingSenderId: "378530800519",
+        appId: "1:378530800519:web:b0970b40576db85410a922",
+        measurementId: "G-W5VCHNG12P"
+    };
 
-/* ⭐ FIXED REGISTER */
-function register(){
-  const u = regUser.value.trim();
-  const p = regPass.value.trim();
-  if(!u || !p){ alert("Enter details"); return; }
-  localStorage.setItem("user",u);
-  localStorage.setItem("pass",p);
-  alert("Registered!");
-  showLogin();
-}
+    // 3. Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
 
-/* ⭐ FIXED LOGIN */
-function login(){
-  const u = loginUser.value.trim();
-  const p = loginPass.value.trim();
+    const loginPage = document.getElementById("loginPage");
+    const registerPage = document.getElementById("registerPage");
+    const dashboard = document.getElementById("dashboard");
 
-  if(u===localStorage.getItem("user") && p===localStorage.getItem("pass")){
-    loginUser.value="";
-    loginPass.value="";
-    loginPage.style.display="none";
-    dashboard.style.display="block";
-    setTimeout(resizePlots,200);
-  } else alert("Invalid login");
-}
+    // 4. Persistence Logic: Check if user is already logged in
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            loginPage.style.display = "none";
+            registerPage.style.display = "none";
+            dashboard.style.display = "flex";
+            setTimeout(resizePlots, 150);
+        } else {
+            loginPage.style.display = "flex";
+            dashboard.style.display = "none";
+        }
+    });
 
-function logout(){
-  dashboard.style.display="none";
-  loginPage.style.display="flex";
-  loginUser.value="";
-  loginPass.value="";
-}
-
-const ws = new WebSocket("ws://10.101.0.4:8765");
-
-let soilFlag=[],soilVal=[],airHum=[],time=[];
-let live={soilFlag:true,soilVal:true,airHum:true};
-let visible={soilFlag:true,soilVal:true,airHum:true};
-
-const grid=document.getElementById("grid");
-const originalOrder=Array.from(grid.children);
-let expandedPanel=null;
-
-function initPlot(id,label){
-  Plotly.newPlot(id,[{x:[],y:[],mode:"lines",line:{width:2}}],{
-    template:"plotly_dark",
-    margin:{l:30,r:10,t:50,b:30},
-    paper_bgcolor:"#161b22",
-    plot_bgcolor:"#161b22",
-    autosize:true,
-    title:{
-      text:label,
-      x:0.5,
-      xanchor:"center",
-      y:0.95,
-      yanchor:"top",
-      font:{size:16}
+    function showRegister(){ 
+        document.getElementById("loginUser").value = "";
+        document.getElementById("loginPass").value = "";
+        loginPage.style.display="none"; 
+        registerPage.style.display="flex"; 
     }
-  },{displayModeBar:false,responsive:true});
-}
+    function showLogin(){ 
+        document.getElementById("regUser").value = "";
+        document.getElementById("regPass").value = "";
+        registerPage.style.display="none"; 
+        loginPage.style.display="flex"; 
+    }
 
-initPlot("soilFlag","Soil Flag");
-initPlot("soilVal","Soil Moisture");
-initPlot("airHum","Air Humidity");
+    function register(){
+        const email = document.getElementById("regUser").value;
+        const pass = document.getElementById("regPass").value;
+        if(!email || !pass) { alert("Please enter both fields"); return; }
+        
+        // Firebase Create User
+        auth.createUserWithEmailAndPassword(email, pass)
+            .then(() => alert("Registration Successful!"))
+            .catch(error => alert(error.message));
+    }
 
-function updatePlots(){
-  if(live.soilFlag) Plotly.update("soilFlag",{x:[time],y:[soilFlag]});
-  if(live.soilVal) Plotly.update("soilVal",{x:[time],y:[soilVal]});
-  if(live.airHum) Plotly.update("airHum",{x:[time],y:[airHum]});
-}
+    function login(){
+        const email = document.getElementById("loginUser").value;
+        const pass = document.getElementById("loginPass").value;
+        
+        // Firebase Sign In
+        auth.signInWithEmailAndPassword(email, pass)
+            .catch(error => alert("Login Failed: " + error.message));
+    }
 
-function zoomIn(id){
-  const len=time.length;
-  if(len<10)return;
-  const start=Math.max(0,len-50);
-  Plotly.relayout(id,{"xaxis.range":[time[start],time[len-1]]});
-}
+    function logout() {
+        auth.signOut().then(() => location.reload());
+    }
 
-function zoomOut(id){ Plotly.relayout(id,{"xaxis.autorange":true}); }
+    function initPlot(id, label, color) {
+        Plotly.newPlot(id, [{x:[], y:[], mode:'lines', line:{color:color, width:2}}], {
+            template: 'plotly_dark',
+            margin: {l:40, r:15, t:40, b:40},
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            title: {text: label, font: {size: 14}},
+            autosize: true,
+            xaxis: { showgrid: false, zeroline: false },
+            yaxis: { showgrid: false, zeroline: false }
+        }, {responsive: true, displayModeBar: false});
+    }
 
-function toggleFullscreen(panelId){
-  const panel=document.getElementById(panelId);
-  if(expandedPanel===panel){
-    grid.classList.remove("fullscreen");
-    panel.classList.remove("expanded");
-    originalOrder.forEach(p=>grid.appendChild(p));
-    expandedPanel=null;
-  } else {
-    grid.classList.add("fullscreen");
-    panel.classList.add("expanded");
-    grid.prepend(panel);
-    expandedPanel=panel;
-  }
-  setTimeout(resizePlots,200);
-}
+    initPlot("soilFlag", "Pump Active (Binary)", "#58a6ff");
+    initPlot("soilVal", "Soil Moisture (%)", "#3fb950");
+    initPlot("airHum", "Air Humidity (%)", "#d29922");
 
-function resizePlots(){
-  Plotly.Plots.resize("soilFlag");
-  Plotly.Plots.resize("soilVal");
-  Plotly.Plots.resize("airHum");
-}
+    function resizePlots() {
+        Plotly.Plots.resize("soilFlag");
+        Plotly.Plots.resize("soilVal");
+        Plotly.Plots.resize("airHum");
+    }
+    window.addEventListener('resize', resizePlots);
 
-window.addEventListener("resize",resizePlots);
+    function toggleZoom(id) {
+        const panel = document.getElementById(`panel-${id}`);
+        const btn = document.getElementById(`zoom-btn-${id}`);
+        if (panel.classList.contains('zoomed')) {
+            panel.classList.remove('zoomed');
+            btn.innerHTML = "⛶";
+        } else {
+            panel.classList.add('zoomed');
+            btn.innerHTML = "⧉";
+        }
+        setTimeout(() => Plotly.Plots.resize(id), 50);
+    }
 
-function toggleTrace(id){ visible[id]=!visible[id]; Plotly.restyle(id,{visible:visible[id]}); }
-function toggleLive(id){ live[id]=!live[id]; }
+    let soilFlag=[], soilVal=[], airHum=[], time=[];
+    let live={soilFlag:true, soilVal:true, airHum:true};
+    function toggleLive(id){ live[id] = !live[id]; }
 
-ws.onmessage=(event)=>{
-  const parts=event.data.split(",");
-  if(parts.length!==3)return;
+    const ws = new WebSocket("ws://127.0.0.1:8765");
+    ws.onmessage = (e) => {
+        const parts = e.data.split(",");
+        if(parts.length !== 3) return;
+        const sf = parseFloat(parts[0]), sv = parseFloat(parts[1]), ah = parseFloat(parts[2]), t = new Date();
 
-  const sf=parseFloat(parts[0]);
-  const sv=parseFloat(parts[1]);
-  const ah=parseFloat(parts[2]);
-  const t=new Date();
+        time.push(t); soilFlag.push(sf); soilVal.push(sv); airHum.push(ah);
+        if(time.length > 50) { time.shift(); soilFlag.shift(); soilVal.shift(); airHum.shift(); }
 
-  time.push(t); soilFlag.push(sf); soilVal.push(sv); airHum.push(ah);
+        if(live.soilFlag) Plotly.update("soilFlag", {x:[time], y:[soilFlag]});
+        if(live.soilVal) Plotly.update("soilVal", {x:[time], y:[soilVal]});
+        if(live.airHum) Plotly.update("airHum", {x:[time], y:[airHum]});
 
-  if(time.length>200){ time.shift(); soilFlag.shift(); soilVal.shift(); airHum.shift(); }
-
-  updatePlots();
-
-  const pump=document.getElementById("pump");
-  if(sf===1){ pump.className="pump-on"; pump.innerText="💧 Pump ON"; }
-  else { pump.className="pump-off"; pump.innerText="Pump OFF"; }
-};
+        const p = document.getElementById("pump");
+        p.className = sf === 1 ? "pump-on" : "pump-off";
+        p.innerText = sf === 1 ? "💧 Pump is ACTIVE" : "Pump Status: IDLE";
+    };
 </script>
-
 </body>
 </html>
