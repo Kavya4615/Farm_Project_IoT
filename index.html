@@ -287,7 +287,7 @@
     let live={soilFlag:true, soilVal:true, airHum:true};
     function toggleLive(id){ live[id] = !live[id]; }
 
-    const ws = new WebSocket("ws://127.0.0.1:8765");
+    const ws = new WebSocket("ws://0.0.0.0:8765");
     ws.onmessage = (e) => {
         const parts = e.data.split(",");
         if(parts.length !== 3) return;
