@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sensor Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+<style>
+body {
+  background:#0e1117;
+  color:#e6edf3;
+  font-family:Arial;
+  margin:0;
+}
+
+/* ---------- AUTH ---------- */
+.auth-container{
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.auth-box{
+  background:#161b22;
+  border:1px solid #30363d;
+  border-radius:10px;
+  padding:30px;
+  width:300px;
+}
+
+.auth-box h2{
+  margin-top:0;
+  text-align:center;
+}
+
+.auth-box input{
+  width:100%;
+  padding:8px;
+  margin:6px 0;
+  border-radius:4px;
+  border:1px solid #444;
+  background:#0e1117;
+  color:#eee;
+}
+
+.auth-btn{
+  width:100%;
+  margin-top:10px;
+  padding:8px;
+  background:#238636;
+  border:none;
+  color:white;
+  border-radius:4px;
+  cursor:pointer;
+}
+
+.switch{
+  margin-top:10px;
+  text-align:center;
+  font-size:12px;
+  cursor:pointer;
+  color:#58a6ff;
+}
+
+/* ---------- DASHBOARD ---------- */
+.dashboard{
+  display:none;
+  padding:10px;
+  height:100vh;
+  box-sizing:border-box;
+}
+
+.header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.logout-btn{
+  background:#6e1f1f;
+  border:1px solid #a33;
+  color:#fff;
+  padding:6px 10px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+}
+
+.logout-btn:hover{
+  background:#a33;
+}
+
+.grid {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:12px;
+  height:calc(100vh - 90px);
+}
+
+.grid.fullscreen {
+  grid-template-columns:1fr;
+}
+
+.panel {
+  background:#161b22;
+  border:1px solid #30363d;
+  border-radius:10px;
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+
+.panel.expanded {
+  height:auto;
+}
+
+.panel > div:last-child{
+  flex:1;
+}
+
+.controls {
+  display:flex;
+  gap:6px;
+  margin-bottom:6px;
+}
+
+.btn {
+  background:#222;
+  border:1px solid #444;
+  color:#eee;
+  padding:4px 8px;
+  border-radius:4px;
+  cursor:pointer;
+  font-size:12px;
+}
+
+.btn:hover { background:#444; }
+
+.pump-on {
+  background:#1f6f4a;
+  padding:12px;
+  border-radius:8px;
+  text-align:center;
+  font-weight:bold;
+}
+
+.pump-off {
+  background:#6e1f1f;
+  padding:12px;
+  border-radius:8px;
+  text-align:center;
+  font-weight:bold;
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width:1100px){
+  .grid{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media (max-width:700px){
+  .grid{
+    grid-template-columns:1fr;
+    height:auto;
+  }
+
+  .dashboard{
+    height:auto;
+  }
+
+  .controls{
+    flex-wrap:wrap;
+  }
+
+  .btn{
+    font-size:11px;
+    padding:3px 6px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div class="auth-container" id="loginPage">
+  <div class="auth-box">
+    <h2>Login</h2>
+    <input id="loginUser" placeholder="Username">
+    <input id="loginPass" type="password" placeholder="Password">
+    <button class="auth-btn" onclick="login()">Login</button>
+    <div class="switch" onclick="showRegister()">Create account</div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div class="auth-container" id="registerPage" style="display:none;">
+  <div class="auth-box">
+    <h2>Register</h2>
+    <input id="regUser" placeholder="Username">
+    <input id="regPass" type="password" placeholder="Password">
+    <button class="auth-btn" onclick="register()">Register</button>
+    <div class="switch" onclick="showLogin()">Back to login</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+
+<div class="header">
+  <h2>Sensor Dashboard</h2>
+  <div class="logout-btn" onclick="logout()">Logout</div>
+</div>
+
+<div id="pump" class="pump-off">Pump OFF</div>
+
+<div class="grid" id="grid">
+
+  <div class="panel" id="panel-soilFlag">
+    <div class="controls">
+      <div class="btn" onclick="zoomIn('soilFlag')">＋</div>
+      <div class="btn" onclick="zoomOut('soilFlag')">－</div>
+      <div class="btn" onclick="toggleFullscreen('panel-soilFlag')">⛶</div>
+      <div class="btn" onclick="toggleTrace('soilFlag')">Value</div>
+      <div class="btn" onclick="toggleLive('soilFlag')">▶/⏸</div>
+    </div>
+    <div id="soilFlag"></div>
+  </div>
+
+  <div class="panel" id="panel-soilVal">
+    <div class="controls">
+      <div class="btn" onclick="zoomIn('soilVal')">＋</div>
+      <div class="btn" onclick="zoomOut('soilVal')">－</div>
+      <div class="btn" onclick="toggleFullscreen('panel-soilVal')">⛶</div>
+      <div class="btn" onclick="toggleTrace('soilVal')">Value</div>
+      <div class="btn" onclick="toggleLive('soilVal')">▶/⏸</div>
+    </div>
+    <div id="soilVal"></div>
+  </div>
+
+  <div class="panel" id="panel-airHum">
+    <div class="controls">
+      <div class="btn" onclick="zoomIn('airHum')">＋</div>
+      <div class="btn" onclick="zoomOut('airHum')">－</div>
+      <div class="btn" onclick="toggleFullscreen('panel-airHum')">⛶</div>
+      <div class="btn" onclick="toggleTrace('airHum')">Value</div>
+      <div class="btn" onclick="toggleLive('airHum')">▶/⏸</div>
+    </div>
+    <div id="airHum"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function showRegister(){ loginPage.style.display="none"; registerPage.style.display="flex"; }
+function showLogin(){ registerPage.style.display="none"; loginPage.style.display="flex"; }
+
+/* ⭐ FIXED REGISTER */
+function register(){
+  const u = regUser.value.trim();
+  const p = regPass.value.trim();
+  if(!u || !p){ alert("Enter details"); return; }
+  localStorage.setItem("user",u);
+  localStorage.setItem("pass",p);
+  alert("Registered!");
+  showLogin();
+}
+
+/* ⭐ FIXED LOGIN */
+function login(){
+  const u = loginUser.value.trim();
+  const p = loginPass.value.trim();
+
+  if(u===localStorage.getItem("user") && p===localStorage.getItem("pass")){
+    loginUser.value="";
+    loginPass.value="";
+    loginPage.style.display="none";
+    dashboard.style.display="block";
+    setTimeout(resizePlots,200);
+  } else alert("Invalid login");
+}
+
+function logout(){
+  dashboard.style.display="none";
+  loginPage.style.display="flex";
+  loginUser.value="";
+  loginPass.value="";
+}
+
+const ws = new WebSocket("ws://10.101.0.4:8765");
+
+let soilFlag=[],soilVal=[],airHum=[],time=[];
+let live={soilFlag:true,soilVal:true,airHum:true};
+let visible={soilFlag:true,soilVal:true,airHum:true};
+
+const grid=document.getElementById("grid");
+const originalOrder=Array.from(grid.children);
+let expandedPanel=null;
+
+function initPlot(id,label){
+  Plotly.newPlot(id,[{x:[],y:[],mode:"lines",line:{width:2}}],{
+    template:"plotly_dark",
+    margin:{l:30,r:10,t:50,b:30},
+    paper_bgcolor:"#161b22",
+    plot_bgcolor:"#161b22",
+    autosize:true,
+    title:{
+      text:label,
+      x:0.5,
+      xanchor:"center",
+      y:0.95,
+      yanchor:"top",
+      font:{size:16}
+    }
+  },{displayModeBar:false,responsive:true});
+}
+
+initPlot("soilFlag","Soil Flag");
+initPlot("soilVal","Soil Moisture");
+initPlot("airHum","Air Humidity");
+
+function updatePlots(){
+  if(live.soilFlag) Plotly.update("soilFlag",{x:[time],y:[soilFlag]});
+  if(live.soilVal) Plotly.update("soilVal",{x:[time],y:[soilVal]});
+  if(live.airHum) Plotly.update("airHum",{x:[time],y:[airHum]});
+}
+
+function zoomIn(id){
+  const len=time.length;
+  if(len<10)return;
+  const start=Math.max(0,len-50);
+  Plotly.relayout(id,{"xaxis.range":[time[start],time[len-1]]});
+}
+
+function zoomOut(id){ Plotly.relayout(id,{"xaxis.autorange":true}); }
+
+function toggleFullscreen(panelId){
+  const panel=document.getElementById(panelId);
+  if(expandedPanel===panel){
+    grid.classList.remove("fullscreen");
+    panel.classList.remove("expanded");
+    originalOrder.forEach(p=>grid.appendChild(p));
+    expandedPanel=null;
+  } else {
+    grid.classList.add("fullscreen");
+    panel.classList.add("expanded");
+    grid.prepend(panel);
+    expandedPanel=panel;
+  }
+  setTimeout(resizePlots,200);
+}
+
+function resizePlots(){
+  Plotly.Plots.resize("soilFlag");
+  Plotly.Plots.resize("soilVal");
+  Plotly.Plots.resize("airHum");
+}
+
+window.addEventListener("resize",resizePlots);
+
+function toggleTrace(id){ visible[id]=!visible[id]; Plotly.restyle(id,{visible:visible[id]}); }
+function toggleLive(id){ live[id]=!live[id]; }
+
+ws.onmessage=(event)=>{
+  const parts=event.data.split(",");
+  if(parts.length!==3)return;
+
+  const sf=parseFloat(parts[0]);
+  const sv=parseFloat(parts[1]);
+  const ah=parseFloat(parts[2]);
+  const t=new Date();
+
+  time.push(t); soilFlag.push(sf); soilVal.push(sv); airHum.push(ah);
+
+  if(time.length>200){ time.shift(); soilFlag.shift(); soilVal.shift(); airHum.shift(); }
+
+  updatePlots();
+
+  const pump=document.getElementById("pump");
+  if(sf===1){ pump.className="pump-on"; pump.innerText="💧 Pump ON"; }
+  else { pump.className="pump-off"; pump.innerText="Pump OFF"; }
+};
+</script>
+
+</body>
+</html>
